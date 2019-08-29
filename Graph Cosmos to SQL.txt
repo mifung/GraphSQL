@@ -1,0 +1,157 @@
+-- Partial Codes from Cosmos DB
+
+   { "UpdateVertex",   "g.V('thomas').property('age', 44)" },
+   { "CountVertices",  "g.V().count()" },
+   { "Filter Range",   "g.V().hasLabel('person').has('age', gt(40))" },
+   { "Project",        "g.V().hasLabel('person').values('firstName')" },
+   { "Sort",           "g.V().hasLabel('person').order().by('firstName', decr)" },
+   { "Traverse",       "g.V('thomas').out('knows').hasLabel('person')" },
+   { "Traverse 2x",    "g.V('thomas').out('knows').hasLabel('person').out('knows').hasLabel('person')" },
+   { "Loop",           "g.V('thomas').repeat(out()).until(has('id', 'robin')).path()" },
+   { "DropEdge",       "g.V('thomas').outE('knows').where(inV().has('id', 'mary')).drop()" },
+   { "CountEdges",     "g.E().count()" },
+   { "DropVertex",     "g.V('thomas').drop()" },
+
+
+-- Replicate the code in Cosmos DB in SQL Graph
+ DROP TABLE IF EXISTS Persons;   -- create FishSpecies Node
+  GO
+  CREATE TABLE Persons (
+    PersonID INT IDENTITY PRIMARY KEY,
+    Firstname VARCHAR(100) NOT NULL,
+    LastName VARCHAR(100) NOT NULL,
+    Age int
+  ) AS NODE;
+ 
+ 
+--Insert Nodes (Note that Cosmos can have unstructured data, but not in SQL)
+INSERT INTO Persons (FirstName, LastName, Age) VALUES
+('Thomas', 44),
+('Mary', 'Andersen', 39),
+('Ben', 'Miller'),
+('Robin', 'Wakefield');
+
+
+--------------------------Graph Database----------------------------------
+  USE master;
+  GO
+  DROP DATABASE IF EXISTS FishGraph;
+  GO
+  CREATE DATABASE FishGraph;
+  GO
+
+  --------------------------Node Tables----------------------------------
+
+ DROP TABLE IF EXISTS FishSpecies;   -- create FishSpecies Node
+  GO
+  CREATE TABLE FishSpecies (
+    FishID INT IDENTITY PRIMARY KEY,   -- notice the primary key
+    CommonName NVARCHAR(100) NOT NULL,
+    ScientificName NVARCHAR(100) NOT NULL
+  ) AS NODE;
+
+
+-- Review the table creation using sys.tables
+-- when you add a node table, graph_id and node_id are created. The $node_id column stores a unique identifier for each entity
+  SELECT name, graph_type, graph_type_desc   
+  FROM sys.columns
+  WHERE object_id = OBJECT_ID('FishSpecies');
+
+--Insert Nodes
+INSERT INTO FishSpecies (CommonName, ScientificName) VALUES
+('Atlantic halibut', 'Hippoglossus hippoglossus'),
+('Chinook salmon', 'Oncorhynchus tshawytscha'),
+('European seabass', 'Morone (Decentrarchus) labrax'),
+('Gizzard shad', 'Dorosoma cepedianum'),
+('Japanese striped knife jaw', 'Oplegnathus faciatus'),
+('Northern pike', 'Esox lucius'),
+('Pacific herring', 'Clupea pallasi'),
+('Rainbow trout', 'Oncorhynchus mykiss'),
+('Sole (Dover)', 'Solea solea'),
+('White bass', 'Morone chrysops');
+
+
+-- Create a FishLover table
+DROP TABLE IF EXISTS FishLover;
+  GO
+  CREATE TABLE FishLover (
+    FishLoverID INT IDENTITY PRIMARY KEY,
+    Username NVARCHAR(50) NOT NULL,
+  ) AS NODE;
+  INSERT INTO FishLover (Username) VALUES
+  ('powerangler'),
+  ('jessie98'),
+  ('hooked'),
+  ('deepdive'),
+  ('underwatercasey');
+
+
+  -- Create Fish Post
+  DROP TABLE IF EXISTS FishPost;
+  GO
+  CREATE TABLE FishPost (
+    PostID INT IDENTITY PRIMARY KEY,
+    Title NVARCHAR(50) NOT NULL,
+    MessageText NVARCHAR(800) NOT NULL
+  ) AS NODE;
+  INSERT INTO FishPost (Title, MessageText) VALUES
+  ('The one that got away', 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor.'),
+  ('A study in fish', 'Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.'),
+  ('Hook, line and sinker ', 'Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu.'),
+  ('So many fish, so little time', 'Nullam dictum felis eu pede mollis pretium. Integer tincidunt.'),
+  ('My favorite fish', 'Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, enim.');
+
+  --------------------------EDGE Tables----------------------------------
+  DROP TABLE IF EXISTS Posts;
+  GO
+  CREATE TABLE Posts (
+    ImportantFlag BIT NOT NULL DEFAULT 0    -- no primary key
+  ) AS EDGE;
+
+  
+  -- Check the sys table
+  SELECT is_node, is_edge FROM sys.tables
+  WHERE name = 'Posts';
+
+-- Check the sys columns 
+  SELECT name, graph_type, graph_type_desc   -- concerned about $edge_id, $from_id, $to_id
+  FROM sys.columns
+  WHERE object_id = OBJECT_ID('Posts');
+
+  -- Example to linking Node to Edge
+  INSERT INTO Posts ($from_id, $to_id) VALUES (
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 1), 
+    (SELECT $node_id FROM FishPost WHERE PostID = 3));
+
+--query the Posts Edge
+select * from posts
+
+-- Add few more entries
+ INSERT INTO Posts ($from_id, $to_id) VALUES (
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 3), 
+    (SELECT $node_id FROM FishPost WHERE PostID = 2));
+  INSERT INTO Posts ($from_id, $to_id) VALUES (
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 2), 
+    (SELECT $node_id FROM FishPost WHERE PostID = 5));
+  INSERT INTO Posts ($from_id, $to_id, ImportantFlag) VALUES (
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 5), 
+    (SELECT $node_id FROM FishPost WHERE PostID = 4), 1);
+  INSERT INTO Posts ($from_id, $to_id, ImportantFlag) VALUES (
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 4), 
+    (SELECT $node_id FROM FishPost WHERE PostID = 1), 1);
+
+
+-- Create Likes Edge
+    DROP TABLE IF EXISTS Likes;
+  GO
+  CREATE TABLE Likes AS EDGE;   -- define any relationships you want
+  INSERT INTO Likes ($from_id, $to_id) VALUES (    -- not limited to any one set of nodes
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 3), 
+    (SELECT $node_id FROM FishSpecies WHERE FishID = 8));
+  INSERT INTO Likes ($from_id, $to_id) VALUES (
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 5), 
+    (SELECT $node_id FROM FishPost WHERE PostID = 4));
+  INSERT INTO Likes ($from_id, $to_id) VALUES (
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 1), 
+    (SELECT $node_id FROM FishLover WHERE FishLoverID = 4));
+
