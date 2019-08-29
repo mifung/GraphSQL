@@ -1,4 +1,4 @@
--- Partial Codes from Cosmos DB
+--- Partial Codes from Cosmos DB
 
    { "UpdateVertex",   "g.V('thomas').property('age', 44)" },
    { "CountVertices",  "g.V().count()" },
